@@ -5,6 +5,77 @@ LOG_MODULE_REGISTER(demo, LOG_LEVEL_DBG);
 
 #define STACK_SIZE 1024
 
+/* Enable to run task 2 */
+#define TASK2_MUTEX     1
+
+#if defined(TASK2_MUTEX)
+
+/* Task priority */
+#define PRIO_WORKER 5
+
+/* Number of increments */
+#define INCREMENTS  1000000
+
+static volatile uint32_t counter = 0;
+
+static struct k_sem done_sem;
+
+static K_MUTEX_DEFINE(counter_mutex);
+
+void worker_fn(void *p1, void *p2, void *p3)
+{
+    const char* name = k_thread_name_get(k_current_get());
+
+    for (size_t i = 0; i < INCREMENTS; i++)
+    {
+        /* Protect with mutex to guarantee that the
+         * counter won't lose any event */
+        k_mutex_lock(&counter_mutex, K_FOREVER);
+        counter++;
+        k_mutex_unlock(&counter_mutex);
+    }
+
+    LOG_INF("Finished %s", name);
+
+    /* Notify that worker has been finished */
+    k_sem_give(&done_sem);
+}
+
+K_THREAD_DEFINE(worker_a, STACK_SIZE, worker_fn,
+                NULL, NULL, NULL, PRIO_WORKER, 0, 0);
+K_THREAD_DEFINE(worker_b, STACK_SIZE, worker_fn,
+                NULL, NULL, NULL, PRIO_WORKER, 0, 0);
+
+int main(void)
+{
+    int64_t time = k_uptime_get();
+
+    LOG_INF("Counting started...");
+
+    k_sem_init(&done_sem, 0, 2);
+
+    /* Wait workers to finish */
+    k_sem_take(&done_sem, K_FOREVER);
+    k_sem_take(&done_sem, K_FOREVER);
+    
+    LOG_INF("Final value: %d", counter);
+
+    if (counter == (INCREMENTS * 2))
+    {
+        LOG_INF("Success, no race condition detected");
+    }
+    else
+    {
+        LOG_ERR("Error, race condition detected");
+    }
+
+    LOG_INF("Execution time: %lld ms", k_uptime_delta(&time));
+
+    return 0;
+}
+
+#else
+
 #define PRIO_COOP   -1
 #define PRIO_HIGH   3
 #define PRIO_MED    5
@@ -64,4 +135,6 @@ int main(void)
 {
     return 0;
 }
+
+#endif
 
