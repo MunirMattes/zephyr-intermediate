@@ -5,7 +5,7 @@
 LOG_MODULE_REGISTER(homework, LOG_LEVEL_INF);
 
 #define STACK_SIZE            2048
-#define CONTROL_PRIORITY         7
+#define CONTROL_PRIORITY         3
 #define MAINTENANCE_PRIORITY     4
 #define EVENT_PERIOD_MS        250
 #define MAINTENANCE_LOAD_US  45000
@@ -43,6 +43,7 @@ static void event_timer_expiry(struct k_timer *timer)
     k_sem_give(&maintenance_start);
 
     /* TODO: Add an application trace event for this sequence. */
+    sys_trace_named_event("event_ready", event.seq, 0);
 }
 
 K_TIMER_DEFINE(event_timer, event_timer_expiry, NULL);
@@ -67,9 +68,30 @@ static void control_fn(void *p1, void *p2, void *p3)
         LOG_INF("[CONTROL] processed seq=%u", event.seq);
 
         /* TODO: Define a response-time guarantee. */
+        #define DEADLINE_MS     5
+        uint32_t latency_ms = (k_uptime_get_32() - event.ready_ms);
+        static uint32_t deadline_misses = 0;
+
+    #if LOG_ALL_MISSED_EVENTS
         /* TODO: Measure latency and count every deadline miss. */
+        if (latency_ms > DEADLINE_MS) {
+            deadline_misses++;
+            LOG_WRN(
+                "deadline_miss count=%u seq=%u latency_ms=%u",
+                deadline_misses, event.seq, latency_ms);
+        }
+    #else
         /* TODO: Rate-limit repeated warning messages. */
+        if (latency_ms > DEADLINE_MS) {
+            deadline_misses++;
+            LOG_WRN_RATELIMIT(
+                "deadline_miss count=%u seq=%u latency_ms=%u",
+                deadline_misses, event.seq, latency_ms);
+        }
+    #endif
+
         /* TODO: Add an application trace event for completion. */
+        sys_trace_named_event("event_done", event.seq, latency_ms);
     }
 }
 
