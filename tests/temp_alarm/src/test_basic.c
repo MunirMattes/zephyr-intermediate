@@ -75,7 +75,16 @@ ZTEST(temp_alarm_check, test_below_threshold)
 	 * Check the status, and how the module talked to the sensor.
 	 * See TEST_SPEC.md "Suite temp_alarm_check" #1.
 	 */
-	ztest_test_skip();
+	struct temp_alarm_status status;
+
+	sensor_fake_set_temperature(20);
+	zassert_ok(temp_alarm_check(), "check must succeed");
+
+	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
+	
+	zassert_equal(status.last_temp, 20, "last_temp must be 20 after set to 20 C, got %d",
+			status.last_temp);
+	zassert_false(status.is_alarming, "is_alarming must be false with 20 C");
 }
 
 ZTEST(temp_alarm_check, test_at_threshold)
@@ -83,7 +92,16 @@ ZTEST(temp_alarm_check, test_at_threshold)
 	/* TODO(l8-task1): a reading equal to the threshold (30 C) is not an alarm.
 	 * See TEST_SPEC.md "Suite temp_alarm_check" #2.
 	 */
-	ztest_test_skip();
+	struct temp_alarm_status status;
+
+	sensor_fake_set_temperature(30);
+	zassert_ok(temp_alarm_check(), "check must succeed");
+
+	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
+	
+	zassert_false(status.is_alarming, "is_alarming must be false with 30 C");
+	zassert_equal(status.alarm_count, 0U, "alarm_count must be 0 with 30 C, got %u",
+		      status.alarm_count);
 }
 
 ZTEST(temp_alarm_check, test_above_threshold)
@@ -91,7 +109,18 @@ ZTEST(temp_alarm_check, test_above_threshold)
 	/* TODO(l8-task1): a reading of 40 C raises the alarm and counts it.
 	 * See TEST_SPEC.md "Suite temp_alarm_check" #3.
 	 */
-	ztest_test_skip();
+	struct temp_alarm_status status;
+
+	sensor_fake_set_temperature(40);
+	zassert_ok(temp_alarm_check(), "check must succeed");
+
+	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
+	
+	zassert_equal(status.last_temp, 40, "last_temp must be 40 after set to 40 C, got %d",
+			status.last_temp);
+	zassert_true(status.is_alarming, "is_alarming must be true with 40 C");
+	zassert_equal(status.alarm_count, 1U, "alarm_count must be 1 with 40 C, got %u",
+		      status.alarm_count);
 }
 
 /*
@@ -109,7 +138,21 @@ ZTEST(temp_alarm_threshold, test_new_threshold_clears_alarm)
 	 * above the reading. The alarm must clear and stay cleared.
 	 * See TEST_SPEC.md "Suite temp_alarm_threshold" #1.
 	 */
-	ztest_test_skip();
+	struct temp_alarm_status status;
+
+	sensor_fake_set_temperature(40);
+	zassume_ok(temp_alarm_check(), "precondition: check must succeed");
+
+	zassert_ok(temp_alarm_set_threshold(50), "set_threshold must succeed");
+	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
+	zassert_false(status.is_alarming, "is_alarming must be false with 40 C < 50 C");
+
+	zassert_ok(temp_alarm_check(), "check must succeed");
+	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
+	zassert_false(status.is_alarming, "is_alarming must be false after check");
+	
+	zassert_equal(status.alarm_count, 1U, "alarm_count must be 1, got %u",
+		      status.alarm_count);
 }
 
 /*
@@ -127,5 +170,24 @@ ZTEST(temp_alarm_reset, test_reset_clears_state)
 	 * The alarm state must clear, but the last reading must stay.
 	 * See TEST_SPEC.md "Suite temp_alarm_reset" #1.
 	 */
-	ztest_test_skip();
+	struct temp_alarm_status status;
+
+	sensor_fake_set_temperature(40);
+	for (int i = 0; i < 3; i++) {
+		zassume_ok(temp_alarm_check(), "precondition: check must succeed");
+	}
+
+	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
+	zassume_equal(status.alarm_count, 3U, "precondition: alarm_count must be 3, got %u",
+		      status.alarm_count);
+
+	temp_alarm_reset();
+	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
+	zassert_false(status.is_alarming, "is_alarming must be false after reset");
+	zassert_equal(status.alarm_count, 0U, "alarm_count must be 0 after reset, got %u",
+		      status.alarm_count);
+	zassert_equal(status.last_error, 0U, "last_error must be 0 after reset, got %u",
+		      status.last_error);
+	zassert_equal(status.last_temp, 40, "last_temp must be 40 after set to 40 C and reset, got %d",
+			status.last_temp);
 }
