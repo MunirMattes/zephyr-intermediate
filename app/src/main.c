@@ -3,12 +3,47 @@
 
 LOG_MODULE_REGISTER(demo, LOG_LEVEL_DBG);
 
+/*
+ * -------------------------------------------------------------------
+ * TASK2_PROTECT_WITH_MUTEX = 0:
+ *
+ * *** Booting Zephyr OS build v4.4.0 ***
+ * [00:00:00.000,000] <inf> demo: Counting started...
+ * [00:00:00.053,000] <inf> demo: Finished worker_a
+ * [00:00:00.066,000] <inf> demo: Finished worker_b
+ * [00:00:00.066,000] <inf> demo: Final value: 1598209
+ * [00:00:00.066,000] <err> demo: Error, race condition detected
+ * [00:00:00.066,000] <inf> demo: Execution time: 66 ms
+ * 
+ * In this case, the following condition may happen:
+ * - worker_a is running and read the counter value (counter=10);
+ * - Scheduler runs worker_b and worker_a stays ready;
+ * - worker_b reads the counter value (counter=10, yet) and increment it (counter=11);
+ * - worker_b may continue running and incrementing it until counter=55, for example;
+ * - Scheduler runs worker_a again and worker_b stays ready;
+ * - worker_a increments the read counter value (counter was 10 -> counter=11) and
+ * store it in the counter itself;
+ * - Note that, in this case, worker_b increments were lost (10 -> 55);
+ * - The same effect could happen if worker_a starts running when worker_b has just
+ * read the counter value and didn't increment it yet.
+ * 
+ * -------------------------------------------------------------------
+ * TASK2_PROTECT_WITH_MUTEX = 1:
+ *
+ * *** Booting Zephyr OS build v4.4.0 ***
+ * [00:00:00.000,000] <inf> demo: Counting started...
+ * [00:00:15.428,000] <inf> demo: Finished worker_a
+ * [00:00:15.448,000] <inf> demo: Finished worker_b
+ * [00:00:15.448,000] <inf> demo: Final value: 2000000
+ * [00:00:15.448,000] <inf> demo: Success, no race condition detected
+ * [00:00:15.448,000] <inf> demo: Execution time: 15448 ms
+ * 
+ * In this case, the mutex prevents that worker_b starts running while
+ * worker_a is performing a read-modify-write operation in counter or vice-versa.
+*/
+#define TASK2_PROTECT_WITH_MUTEX    1
+
 #define STACK_SIZE 1024
-
-/* Enable to run task 2 */
-#define TASK2_MUTEX     1
-
-#if defined(TASK2_MUTEX)
 
 /* Task priority */
 #define PRIO_WORKER 5
@@ -28,11 +63,18 @@ void worker_fn(void *p1, void *p2, void *p3)
 
     for (size_t i = 0; i < INCREMENTS; i++)
     {
+    #if TASK2_PROTECT_WITH_MUTEX
         /* Protect with mutex to guarantee that the
          * counter won't lose any event */
         k_mutex_lock(&counter_mutex, K_FOREVER);
+    #endif
+
         counter++;
+
+    #if TASK2_PROTECT_WITH_MUTEX
+        /* Unlock mutex, allowing other threads that were waiting for it to run */
         k_mutex_unlock(&counter_mutex);
+    #endif
     }
 
     LOG_INF("Finished %s", name);
@@ -73,68 +115,3 @@ int main(void)
 
     return 0;
 }
-
-#else
-
-#define PRIO_COOP   -1
-#define PRIO_HIGH   3
-#define PRIO_MED    5
-#define PRIO_LOW    7
-
-void t_coop_fn(void *p1, void *p2, void *p3)
-{
-    LOG_INF("T_COOP Heavy work");
-
-    for (size_t i = 0; i < 5; i++)
-    {
-        /* Heavy work */
-        k_busy_wait(75000);
-        LOG_INF("T_COOP step %d/5", (i + 1));
-    }
-
-    LOG_INF("T_COOP k_yield");
-    k_yield();
-    
-    LOG_INF("T_COOP done");
-}
-
-void t_high_fn(void *p1, void *p2, void *p3)
-{
-    while (1) {
-        k_msleep(100);
-        LOG_INF("T_HIGH running");
-    }
-}
-
-void t_med_fn(void *p1, void *p2, void *p3)
-{
-    while (1) {
-        k_msleep(200);
-        LOG_INF("T_MED running");
-    }
-}
-
-void t_low_fn(void *p1, void *p2, void *p3)
-{
-    while (1) {
-        k_msleep(300);
-        LOG_INF("T_LOW running");
-    }
-}
-
-K_THREAD_DEFINE(thread_coop, STACK_SIZE, t_coop_fn,
-                NULL, NULL, NULL, PRIO_COOP, 0, 0);
-K_THREAD_DEFINE(thread_high, STACK_SIZE, t_high_fn,
-                NULL, NULL, NULL, PRIO_HIGH, 0, 0);
-K_THREAD_DEFINE(thread_med, STACK_SIZE, t_med_fn,
-                NULL, NULL, NULL, PRIO_MED, 0, 0);
-K_THREAD_DEFINE(thread_low, STACK_SIZE, t_low_fn,
-                NULL, NULL, NULL, PRIO_LOW, 0, 0);
-
-int main(void)
-{
-    return 0;
-}
-
-#endif
-
