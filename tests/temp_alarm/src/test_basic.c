@@ -82,6 +82,13 @@ ZTEST(temp_alarm_check, test_below_threshold)
 
 	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
 	
+	zassert_equal(fake_sensor_sample_fetch_fake.call_count, 1, 
+		"sensor_sample_fetch must be called 1 time, got %d",
+			fake_sensor_sample_fetch_fake.call_count);
+	zassert_equal(fake_sensor_channel_get_fake.arg1_val, SENSOR_CHAN_AMBIENT_TEMP, 
+		"sensor_channel_get arg must be SENSOR_CHAN_AMBIENT_TEMP, got %d",
+			fake_sensor_channel_get_fake.arg1_val);
+
 	zassert_equal(status.last_temp, 20, "last_temp must be 20 after set to 20 C, got %d",
 			status.last_temp);
 	zassert_false(status.is_alarming, "is_alarming must be false with 20 C");
@@ -142,6 +149,8 @@ ZTEST(temp_alarm_threshold, test_new_threshold_clears_alarm)
 
 	sensor_fake_set_temperature(40);
 	zassume_ok(temp_alarm_check(), "precondition: check must succeed");
+	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
+	zassert_true(status.is_alarming, "is_alarming must be true with 40 C");
 
 	zassert_ok(temp_alarm_set_threshold(50), "set_threshold must succeed");
 	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
@@ -178,7 +187,7 @@ ZTEST(temp_alarm_reset, test_reset_clears_state)
 	}
 
 	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
-	zassume_equal(status.alarm_count, 3U, "precondition: alarm_count must be 3, got %u",
+	zassert_equal(status.alarm_count, 3U, "alarm_count must be 3, got %u",
 		      status.alarm_count);
 
 	temp_alarm_reset();
