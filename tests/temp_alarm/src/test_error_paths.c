@@ -176,10 +176,21 @@ ZTEST(temp_alarm_invalid_input, test_set_threshold_out_of_range)
 	 * See TEST_SPEC.md "Suite temp_alarm_invalid_input" #4.
 	 */
 	int ret;
+	struct temp_alarm_status status;
 
 	ret = temp_alarm_set_threshold(-1);
 	zassert_equal(ret, -EINVAL, "set_threshold with -1 must be -EINVAL, got %d", ret);
 	
 	ret = temp_alarm_set_threshold(101);
 	zassert_equal(ret, -EINVAL, "set_threshold with 101 must be -EINVAL, got %d", ret);
+
+	sensor_fake_set_temperature(30);
+	zassume_ok(temp_alarm_check(), "precondition: check must succeed");
+	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
+	zassert_false(status.is_alarming, "is_alarming must be false with 30 C after set_threshold failed");
+
+	sensor_fake_set_temperature(31);
+	zassume_ok(temp_alarm_check(), "precondition: check must succeed");
+	zassume_ok(temp_alarm_get_status(&status), "precondition: get_status must succeed");
+	zassert_true(status.is_alarming, "is_alarming must be true with 31 C after set_threshold failed");
 }
