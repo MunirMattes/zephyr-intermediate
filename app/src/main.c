@@ -6,7 +6,32 @@ LOG_MODULE_REGISTER(demo, LOG_LEVEL_DBG);
 
 #define STACK_SIZE       2048
 
-/* Publish simulated sensor samples every 100 ms */
+/* Publish simulated sensor samples every 100 ms
+ * Long run logging:
+[00:00:00.000,000] <inf> demo: === L4 Task 1: Zbus ===
+[00:00:00.000,000] <inf> demo: sensor publishes every 100ms
+[00:00:00.000,000] <inf> demo: display listener runs in publisher context
+[00:00:00.000,000] <inf> demo: logger uses message subscriber copies
+[00:00:00.000,000] <inf> demo: [SENSOR] publish seq=0 temp=24000 mC
+[00:00:00.000,000] <inf> demo: [DISPLAY-LIS] thread=sensor seq=0 temp=24000 mC
+[00:00:00.000,000] <inf> demo: [LOGGER-MSG] thread=logger seq=0 temp=24000 latency=0ms
+[00:00:00.100,000] <inf> demo: [SENSOR] publish seq=1 temp=24350 mC
+[00:00:00.100,000] <inf> demo: [DISPLAY-LIS] thread=sensor seq=1 temp=24350 mC
+[00:00:00.100,000] <inf> demo: [LOGGER-MSG] thread=logger seq=1 temp=24350 latency=0ms
+[00:00:00.200,000] <inf> demo: [SENSOR] publish seq=2 temp=24700 mC
+[00:00:00.200,000] <inf> demo: [DISPLAY-LIS] thread=sensor seq=2 temp=24700 mC
+[00:00:00.200,000] <inf> demo: [LOGGER-MSG] thread=logger seq=2 temp=24700 latency=0ms
+...
+[00:04:12.452,000] <inf> demo: [SENSOR] publish seq=218 temp=906700 mC
+[00:04:12.452,000] <inf> demo: [DISPLAY-LIS] thread=sensor seq=218 temp=906700 mC
+[00:04:12.452,000] <inf> demo: [LOGGER-MSG] thread=logger seq=218 temp=906700 latency=0ms
+[00:04:12.552,000] <inf> demo: [SENSOR] publish seq=219 temp=907050 mC
+[00:04:12.552,000] <inf> demo: [DISPLAY-LIS] thread=sensor seq=219 temp=907050 mC
+[00:04:12.552,000] <inf> demo: [LOGGER-MSG] thread=logger seq=219 temp=907050 latency=0ms
+[00:04:12.652,000] <inf> demo: [SENSOR] publish seq=220 temp=907400 mC
+[00:04:12.652,000] <inf> demo: [DISPLAY-LIS] thread=sensor seq=220 temp=907400 mC
+[00:04:12.652,000] <inf> demo: [LOGGER-MSG] thread=logger seq=220 temp=907400 latency=0ms
+*/
 #define SENSOR_PERIOD_MS  100
 
 
@@ -143,7 +168,7 @@ static void logger_thread_fn(void *p1, void *p2, void *p3)
          * Slow logger.
          * Message copies let it process old samples safely.
          */
-        k_msleep(350);
+        k_msleep(50);
     }
 
     LOG_INF("[LOGGER-MSG] done received=%d", received);
